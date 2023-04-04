@@ -134,9 +134,14 @@ HMODULE GetLoadedModule(const std::string& moduleFileName)
 	return NULL;
 }
 
-void HookDll(const std::string& moduleFileName)
+bool HookDll(const std::string& moduleFileName)
 {
 	HMODULE hModule = GetLoadedModule(moduleFileName);
+
+	if (hModule == NULL)
+	{
+		return false;
+	}
 
 	auto exportedFunctions = GetExportedFunctions(hModule);
 
@@ -158,6 +163,8 @@ void HookDll(const std::string& moduleFileName)
 	{
 		DetourAttach(reinterpret_cast<void**>(&hookFunctions[i]), logFunctions[i]);
 	}
+
+	return true;
 }
 
 void Unhook()
@@ -196,7 +203,10 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 		DetourTransactionBegin();
 		DetourUpdateThread(GetCurrentThread());
 
-		HookDll("WS2_32.dll");
+		if (!HookDll("WS2_32.dll"))
+		{
+			MessageBoxA(NULL, "HookDll failed", "", MB_OK);
+		}
 
 		if (DetourTransactionCommit() == NO_ERROR)
 		{
