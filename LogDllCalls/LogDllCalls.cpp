@@ -44,9 +44,10 @@ void* AllocateLogFunctionBuffer()
 
 LogFunction GenerateLogFunction(void* pLogFunctionBuffer, const char* pFunctionName, void** ppOriginal)
 {
-	const int functionNameBufferSize = 4096;
-	char* pFunctionNameCopy = new char[functionNameBufferSize];
-	strcpy_s(pFunctionNameCopy, functionNameBufferSize, pFunctionName);
+	size_t functionNameLength = strlen(pFunctionName);
+
+	char* pFunctionNameCopy = new char[functionNameLength + 1];
+	strcpy_s(pFunctionNameCopy, functionNameLength + 1, pFunctionName);
 
 	CodeHolder codeHolder;
 	codeHolder.init(hostEnvironment());
