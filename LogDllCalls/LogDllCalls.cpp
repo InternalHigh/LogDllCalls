@@ -133,6 +133,45 @@ HMODULE GetLoadedModule(const std::string& moduleFileName)
 	return NULL;
 }
 
+void HookDll(const std::string& moduleFileName)
+{
+	HMODULE hModule = GetLoadedModule(moduleFileName);
+
+	auto exportedFunctions = GetExportedFunctions(hModule);
+
+	for (const auto& exportedFunction : exportedFunctions)
+	{
+		void* pLogFunction = AllocateLogFunctionBuffer();
+		logFunctions.push_back(pLogFunction);
+
+		auto hookFunction = GetProcAddress(hModule, exportedFunction.c_str());
+		hookFunctions.push_back(hookFunction);
+	}
+
+	for (size_t i = 0; i < hookFunctions.size(); i++)
+	{
+		GenerateLogFunction(logFunctions[i], exportedFunctions[i].c_str(), &hookFunctions[i]);
+	}
+
+	for (size_t i = 0; i < hookFunctions.size(); i++)
+	{
+		DetourAttach(reinterpret_cast<void**>(&hookFunctions[i]), logFunctions[i]);
+	}
+}
+
+void Unhook()
+{
+	DetourTransactionBegin();
+	DetourUpdateThread(GetCurrentThread());
+
+	for (size_t i = 0; i < hookFunctions.size(); i++)
+	{
+		DetourDetach(reinterpret_cast<void**>(&hookFunctions[i]), logFunctions[i]);
+	}
+
+	DetourTransactionCommit();
+}
+
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved)
 {
 	if (DetourIsHelperProcess())
@@ -156,28 +195,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 		DetourTransactionBegin();
 		DetourUpdateThread(GetCurrentThread());
 
-		auto winsockModule = GetLoadedModule("WS2_32.dll");
-
-		auto exportedFunctions = GetExportedFunctions(winsockModule);
-
-		for (const auto& exportedFunction : exportedFunctions)
-		{
-			void* pLogFunction = AllocateLogFunctionBuffer();
-			logFunctions.push_back(pLogFunction);
-
-			auto hookFunction = GetProcAddress(winsockModule, exportedFunction.c_str());
-			hookFunctions.push_back(hookFunction);
-		}
-
-		for (size_t i = 0; i < hookFunctions.size(); i++)
-		{
-			GenerateLogFunction(logFunctions[i], exportedFunctions[i].c_str(), &hookFunctions[i]);
-		}
-
-		for (size_t i = 0; i < hookFunctions.size(); i++)
-		{
-			DetourAttach(reinterpret_cast<void**>(&hookFunctions[i]), logFunctions[i]);
-		}
+		HookDll("WS2_32.dll");
 
 		if (DetourTransactionCommit() == NO_ERROR)
 		{
@@ -188,15 +206,8 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 	}
 	case DLL_PROCESS_DETACH:
 	{
-		DetourTransactionBegin();
-		DetourUpdateThread(GetCurrentThread());
-
-		for (size_t i = 0; i < hookFunctions.size(); i++)
-		{
-			DetourDetach(reinterpret_cast<void**>(&hookFunctions[i]), logFunctions[i]);
-		}
-
-		DetourTransactionCommit();
+		Unhook();
+		break;
 	}
 	}
 	return TRUE;
