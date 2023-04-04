@@ -32,7 +32,9 @@ int main(int argc, char** argv)
 	char cmdLine[MAX_PATH];
 	strcpy_s(cmdLine, argv[1]);
 
-	DetourCreateProcessWithDllExA(
+	const char* detourDlls[] = { dllPath.c_str(), "WS2_32.dll" };
+
+	DetourCreateProcessWithDllsA(
 		NULL,
 		cmdLine,
 		NULL,
@@ -43,7 +45,8 @@ int main(int argc, char** argv)
 		NULL,
 		&si,
 		&pi,
-		dllPath.c_str(),
+		_countof(detourDlls),
+		detourDlls,
 		NULL
 	);
 

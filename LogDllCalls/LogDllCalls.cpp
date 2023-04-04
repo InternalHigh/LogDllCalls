@@ -1,6 +1,5 @@
 #define WIN32_LEAN_AND_MEAN
 
-#include <WinSock2.h>
 #include <Windows.h>
 #include <shlwapi.h>
 #include <psapi.h>
@@ -17,9 +16,6 @@ typedef void(_stdcall* LogFunction)();
 
 std::vector<void*> logFunctions;
 std::vector<void*> hookFunctions;
-
-// Force loading of WS2_32.dll
-int (WINAPI* pSend)(SOCKET s, const char* buf, int len, int flags) = send;
 
 void WINAPI Log(const char* pFunctionName)
 {
@@ -206,6 +202,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 		if (!HookDll("WS2_32.dll"))
 		{
 			MessageBoxA(NULL, "HookDll failed", "", MB_OK);
+			break;
 		}
 
 		if (DetourTransactionCommit() == NO_ERROR)
