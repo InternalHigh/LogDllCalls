@@ -146,6 +146,10 @@ bool HookDll(const std::string& moduleFileName)
 
 	auto exportedFunctions = GetExportedFunctions(hModule);
 
+	assert(hookFunctions.size() == logFunctions.size());
+
+	auto startIndex = hookFunctions.size();
+
 	for (const auto& exportedFunction : exportedFunctions)
 	{
 		void* pLogFunction = AllocateLogFunctionBuffer();
@@ -155,14 +159,14 @@ bool HookDll(const std::string& moduleFileName)
 		hookFunctions.push_back(hookFunction);
 	}
 
-	for (size_t i = 0; i < hookFunctions.size(); i++)
+	for (size_t i = 0; i < exportedFunctions.size(); i++)
 	{
-		GenerateLogFunction(logFunctions[i], exportedFunctions[i].c_str(), &hookFunctions[i]);
+		GenerateLogFunction(logFunctions[startIndex + i], exportedFunctions[i].c_str(), &hookFunctions[startIndex + i]);
 	}
 
-	for (size_t i = 0; i < hookFunctions.size(); i++)
+	for (size_t i = 0; i < exportedFunctions.size(); i++)
 	{
-		DetourAttach(reinterpret_cast<void**>(&hookFunctions[i]), logFunctions[i]);
+		DetourAttach(reinterpret_cast<void**>(&hookFunctions[startIndex + i]), logFunctions[startIndex + i]);
 	}
 
 	return true;
