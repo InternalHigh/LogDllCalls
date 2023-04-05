@@ -24,9 +24,11 @@ void WINAPI Log(const char* pFunctionName)
 		return;
 	}
 
-	std::string functionName(pFunctionName);
-	functionName += "\n";
-	OutputDebugString(functionName.c_str());
+	char logLine[4096] = "";
+	strcpy_s(logLine, pFunctionName);
+	strcat_s(logLine, "\n");
+
+	OutputDebugString(logLine);
 }
 
 void* AllocateLogFunctionBuffer()
