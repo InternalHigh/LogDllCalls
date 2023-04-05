@@ -19,7 +19,10 @@ std::vector<void*> hookFunctions;
 
 void WINAPI Log(const char* pFunctionName)
 {
-	if (strcmp(pFunctionName, "WSAGetLastError") == 0 || strcmp(pFunctionName, "WSASetLastError") == 0)
+	if (strcmp(pFunctionName, "GetLastError") == 0
+         || strcmp(pFunctionName, "SetLastError") == 0
+         || strcmp(pFunctionName, "WSAGetLastError") == 0
+         || strcmp(pFunctionName, "WSASetLastError") == 0)
 	{
 		return;
 	}
