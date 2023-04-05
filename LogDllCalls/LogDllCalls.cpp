@@ -93,6 +93,13 @@ std::vector<std::string> GetExportedFunctions(HMODULE lib)
 	for (DWORD i = 0; i < exports->NumberOfNames; i++)
 	{
 		auto exportedFunction = std::string((char*)lib + (int)names[i]);
+
+		// TODO: Fix
+		if (exportedFunction == "gSharedInfo" || exportedFunction == "gapfnScSendMessage")
+		{
+			continue;
+		}
+
 		exportedFunctions.push_back(exportedFunction);
 	}
 
@@ -209,6 +216,12 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 		DetourUpdateThread(GetCurrentThread());
 
 		if (!HookDll("WS2_32.dll"))
+		{
+			MessageBoxA(NULL, "HookDll failed", "", MB_OK);
+			break;
+		}
+
+		if (!HookDll("USER32.dll"))
 		{
 			MessageBoxA(NULL, "HookDll failed", "", MB_OK);
 			break;
