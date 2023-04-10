@@ -22,9 +22,7 @@ std::vector<std::string> hookFunctionNames;
 void WINAPI Log(const char* pFunctionName)
 {
 	if (strcmp(pFunctionName, "GetLastError") == 0
-         || strcmp(pFunctionName, "SetLastError") == 0
-         || strcmp(pFunctionName, "WSAGetLastError") == 0
-         || strcmp(pFunctionName, "WSASetLastError") == 0)
+		|| strcmp(pFunctionName, "SetLastError") == 0)
 	{
 		return;
 	}
@@ -205,7 +203,9 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 		DetourTransactionBegin();
 		DetourUpdateThread(GetCurrentThread());
 
-		if (!AddDll("WS2_32.dll", { }))
+		std::unordered_set<std::string> winsockIgnore = { "WSAGetLastError", "WSASetLastError" };
+
+		if (!AddDll("WS2_32.dll", winsockIgnore))
 		{
 			MessageBoxA(NULL, "AddDll failed", "", MB_OK);
 			break;
