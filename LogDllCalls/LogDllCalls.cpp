@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include <cassert>
+#include <unordered_set>
 #include <detours/detours.h>
 
 #include <asmjit/asmjit.h>
@@ -16,6 +17,7 @@ typedef void(_stdcall* LogFunction)();
 
 std::vector<void*> logFunctions;
 std::vector<void*> hookFunctions;
+std::vector<std::string> hookFunctionNames;
 
 void WINAPI Log(const char* pFunctionName)
 {
@@ -72,7 +74,7 @@ LogFunction GenerateLogFunction(void* pLogFunctionBuffer, const char* pFunctionN
 	return (LogFunction)pLogFunctionBuffer;
 }
 
-std::vector<std::string> GetExportedFunctions(HMODULE lib)
+std::vector<std::string> GetExportedFunctions(HMODULE lib, const std::unordered_set<std::string>& functionsToIgnore)
 {
 	std::vector<std::string> exportedFunctions;
 
@@ -94,13 +96,10 @@ std::vector<std::string> GetExportedFunctions(HMODULE lib)
 	{
 		auto exportedFunction = std::string((char*)lib + (int)names[i]);
 
-		// TODO: Fix
-		if (exportedFunction == "gSharedInfo" || exportedFunction == "gapfnScSendMessage")
+		if (functionsToIgnore.find(exportedFunction) == functionsToIgnore.end())
 		{
-			continue;
+			exportedFunctions.push_back(exportedFunction);
 		}
-
-		exportedFunctions.push_back(exportedFunction);
 	}
 
 	return exportedFunctions;
@@ -142,7 +141,7 @@ HMODULE GetLoadedModule(const std::string& moduleFileName)
 	return NULL;
 }
 
-bool HookDll(const std::string& moduleFileName)
+bool AddDll(const std::string& moduleFileName, const std::unordered_set<std::string>& functionsToIgnore)
 {
 	HMODULE hModule = GetLoadedModule(moduleFileName);
 
@@ -151,29 +150,20 @@ bool HookDll(const std::string& moduleFileName)
 		return false;
 	}
 
-	auto exportedFunctions = GetExportedFunctions(hModule);
+	auto exportedFunctions = GetExportedFunctions(hModule, functionsToIgnore);
 
+	assert(hookFunctions.size() == hookFunctionNames.size());
 	assert(hookFunctions.size() == logFunctions.size());
 
-	auto startIndex = hookFunctions.size();
-
-	for (const auto& exportedFunction : exportedFunctions)
+	for (const auto& exportedFunctionName : exportedFunctions)
 	{
 		void* pLogFunction = AllocateLogFunctionBuffer();
 		logFunctions.push_back(pLogFunction);
 
-		auto hookFunction = GetProcAddress(hModule, exportedFunction.c_str());
+		auto hookFunction = GetProcAddress(hModule, exportedFunctionName.c_str());
 		hookFunctions.push_back(hookFunction);
-	}
 
-	for (size_t i = 0; i < exportedFunctions.size(); i++)
-	{
-		GenerateLogFunction(logFunctions[startIndex + i], exportedFunctions[i].c_str(), &hookFunctions[startIndex + i]);
-	}
-
-	for (size_t i = 0; i < exportedFunctions.size(); i++)
-	{
-		DetourAttach(reinterpret_cast<void**>(&hookFunctions[startIndex + i]), logFunctions[startIndex + i]);
+		hookFunctionNames.push_back(exportedFunctionName);
 	}
 
 	return true;
@@ -215,16 +205,28 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 		DetourTransactionBegin();
 		DetourUpdateThread(GetCurrentThread());
 
-		if (!HookDll("WS2_32.dll"))
+		if (!AddDll("WS2_32.dll", { }))
 		{
-			MessageBoxA(NULL, "HookDll failed", "", MB_OK);
+			MessageBoxA(NULL, "AddDll failed", "", MB_OK);
 			break;
 		}
 
-		if (!HookDll("USER32.dll"))
+		std::unordered_set<std::string> user32Ignore = { "gSharedInfo", "gapfnScSendMessage" };
+
+		if (!AddDll("USER32.dll", user32Ignore))
 		{
-			MessageBoxA(NULL, "HookDll failed", "", MB_OK);
+			MessageBoxA(NULL, "AddDll failed", "", MB_OK);
 			break;
+		}
+
+		for (size_t i = 0; i < hookFunctions.size(); i++)
+		{
+			GenerateLogFunction(logFunctions[i], hookFunctionNames[i].c_str(), &hookFunctions[i]);
+		}
+
+		for (size_t i = 0; i < hookFunctions.size(); i++)
+		{
+			DetourAttach(reinterpret_cast<void**>(&hookFunctions[i]), logFunctions[i]);
 		}
 
 		if (DetourTransactionCommit() == NO_ERROR)
